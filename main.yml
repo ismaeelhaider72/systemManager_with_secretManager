@@ -1,0 +1,74 @@
+description: |-
+  *Replace this default text with instructions or other information about your document.*  
+
+  ---
+  # What is Markdown?
+  Markdown is a lightweight markup language that converts your content with plain text formatting to structurally valid rich text.
+  ## You can add headings
+  You can add *italics* or make the font **bold**.  
+  1. Create numbered lists 
+  * Add bullet points 
+  >Indent `code samples` 
+
+  You can create a [link to another webpage](https://aws.amazon.com/).
+schemaVersion: '0.3'
+assumeRole: '{{ AutomationAssumeRole }}'
+parameters:
+  TopicArn:
+    type: String
+    description: (Required) The ARN of the SNS topic to publish the notification to.
+    default: 'arn:aws:sns:us-east-1:489994096722:ismaeeltopic'
+  Message:
+    type: String
+    description: The following are launching
+    default: this is meassage from ssm
+  AutomationAssumeRole:
+    type: String
+    description: (Optional) The ARN of the role that allows Automation to perform the actions on your behalf.
+    default: ''
+mainSteps:
+  - name: launchEC2
+    action: 'aws:runInstances'
+    inputs:
+      ImageId: ami-0c2b8ca1dad447f8a
+      InstanceType: t2.micro
+      IamInstanceProfileName: full_ssm_access
+      MaxInstanceCount: 1
+      MinInstanceCount: 1
+      KeyName: ismaeelkp2
+      SecurityGroupIds:
+        - sg-0f2b4941e4015219f
+    timeoutSeconds: 400
+    description: launch a instance
+  - name: createTags
+    action: 'aws:createTags'
+    maxAttempts: 3
+    onFailure: Abort
+    inputs:
+      ResourceType: EC2
+      ResourceIds:
+        - '{{launchEC2.InstanceIds}}'
+      Tags:
+        - Key: Name
+          Value: ismaeelInstanceAutomationDocument
+  - name: installmysql
+    action: 'aws:runCommand'
+    inputs:
+      DocumentName: install-pkgs-mysql-wordpress
+      InstanceIds:
+        - '{{launchEC2.InstanceIds}}'
+    timeoutSeconds: 400
+  - name: installwordpress
+    action: 'aws:runCommand'
+    inputs:
+      DocumentName: install_wordpress
+      InstanceIds:
+        - '{{launchEC2.InstanceIds}}'
+    timeoutSeconds: 400
+  - name: PublishSNSNotification
+    action: 'aws:executeAwsApi'
+    inputs:
+      Service: sns
+      Api: Publish
+      TopicArn: '{{TopicArn}}'
+      Message: '{{Message}}, ["{{launchEC2.InstanceIds}}"]  '
