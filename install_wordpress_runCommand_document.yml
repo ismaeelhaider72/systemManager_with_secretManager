@@ -1,0 +1,30 @@
+schemaVersion: "2.2"
+description: "Command Document to install wordpress"
+mainSteps:
+  - action: 'aws:runShellScript'
+    name: installwordpress
+    inputs:
+      runCommand:
+      - yum install httpd php-mysql -y
+      - amazon-linux-extras install -y php7.3
+      - cd /var/www/html
+      - wget https://wordpress.org/latest.tar.gz
+      - tar -xzf latest.tar.gz
+      - cp -r wordpress/* /var/www/html/
+      - rm -rf wordpress
+      - rm -rf latest.tar.gz
+      - chmod -R 755 wp-content
+      - chown -R apache:apache wp-content
+      - service httpd start
+      - chkconfig httpd on
+      - cd /var/www/html
+      - cp wp-config-sample.php wp-config.php
+      - export AWS_DEFAULT_REGION=us-east-1
+      - secretdbname=$(aws secretsmanager get-secret-value --secret-id ismaeelcredentials | jq --raw-output '.SecretString' | jq -r .dbname) 
+      - secretpassword=$(aws secretsmanager get-secret-value --secret-id ismaeelcredentials | jq --raw-output '.SecretString' | jq -r .dbpassword)
+      - echo $secretdbname 
+      - echo $secretpassword
+      - sed -i s/database_name_here/$secretdbname/g wp-config.php
+      - sed -i s/username_here/imsaeeluserdb/g wp-config.php
+      - sed -i s/password_here/$secretpassword/g wp-config.php
+      - sed -i s/localhost/localhost/g wp-config.php

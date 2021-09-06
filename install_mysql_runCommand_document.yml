@@ -1,0 +1,26 @@
+schemaVersion: "2.2"
+description: "Command Document Example JSON Template"
+mainSteps:
+  - action: 'aws:runShellScript'
+    name: getSecretManagervalue
+    inputs:
+      runCommand:
+      - sudo wget https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+      # - sudo yum localinstall mysql57-community-release-el7-11.noarch.rpm -y
+      - sudo yum install -y mysql-community-server
+      - sudo systemctl enable mysqld
+      - sudo systemctl start mysqld
+      - sudo yum install jq -y
+      - 'pass=$(grep -oP "(?<=root@localhost\: )\S+" /var/log/mysqld.log)'
+      - echo $pass
+      - export AWS_DEFAULT_REGION=us-east-1
+      - secretpassword=$(aws secretsmanager get-secret-value --secret-id ismaeelcredentials | jq --raw-output '.SecretString' | jq -r .dbpassword) && password=$(echo \"$secretpassword\")
+      - secretdbname=$(aws secretsmanager get-secret-value --secret-id ismaeelcredentials | jq --raw-output '.SecretString' | jq -r .dbname) 
+      - echo $secretdbname
+      - echo $password
+      - echo $secretpassword
+      - mysql -u root -p$pass -e  "ALTER USER 'root'@'localhost' IDENTIFIED BY $password  " --connect-expired-password
+      - mysql -u root -p$secretpassword  -e "CREATE DATABASE $secretdbname"
+      - mysql -u root -p$secretpassword  -e "CREATE USER 'imsaeeluserdb'@'%' IDENTIFIED BY $password  "
+      - mysql -u root -p$secretpassword  -e 'GRANT ALL PRIVILEGES ON *.* TO "imsaeeluserdb"@"%" '
+      - mysql -u root -p$secretpassword  -e 'FLUSH PRIVILEGES' 
